@@ -1,0 +1,423 @@
+package ui;
+
+import core.Connect4;
+import core.Connect4ComputerPlayer;
+import javafx.animation.TranslateTransition;
+import javafx.application.Application;
+import javafx.stage.Stage;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.Shape;
+import javafx.scene.shape.Ellipse;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.effect.Light;
+import javafx.scene.effect.Lighting;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Parent;
+import javafx.event.EventHandler;
+import javafx.scene.layout.StackPane;
+import javafx.scene.effect.InnerShadow;
+
+import javafx.util.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Uses javafx to implement GUI
+ * 
+ *@author Emma Hermick
+ *@version 2.0
+ */
+public class Connect4GUI extends Application
+{
+	
+	/**Initialize gameBoard with coins*/
+	private Coin[][] gameBoard = new Coin[7][6];
+	
+	/**Initializes pane*/
+	private Pane pane = new Pane();
+	
+	/**Game begins with red coin */
+	private boolean redCoin = true;
+	
+	/**Tracks player's turn*/
+	private boolean turn;
+	
+	/**Connect4 object*/
+	Connect4 connect4 = new Connect4();
+	
+	/**Connect4ComputerPlayer object*/
+	Connect4ComputerPlayer computer = new Connect4ComputerPlayer(connect4);
+	
+	/**
+	 * Computer pane set up - For player vs computer
+	 * @return pane
+	 */
+	public Parent compGrid()
+	{
+		/**New Pane*/
+		Pane p = new Pane();
+		
+		/**New Shape*/
+		Shape s = createBoard();
+		
+		p.getChildren().add(pane);
+		p.getChildren().add(s);
+		p.getChildren().addAll(colComp());
+		
+		return p;
+	}
+	
+	/**
+	 * Player pane set up - For player vs player
+	 * @return pane
+	 */
+	public Parent playGrid()
+	{
+		/**New Pane*/
+		Pane p = new Pane();
+		
+		/**New Shape*/
+		Shape s = createBoard();
+		
+		p.getChildren().add(pane);
+		p.getChildren().add(s);
+		p.getChildren().addAll(colPlayer());
+		
+		return p;
+		
+	}
+	
+	
+	/**
+	 * Creates gameboard
+	 * @return Shape Board that was created
+	 */
+	public Shape createBoard()
+	{
+		/**New shape*/
+		Shape gameboard = new Rectangle(800, 800);
+		
+		for (int r = 0; r < 6; r++)
+		{
+			for (int c = 0; c < 7; c++)
+			{
+				/**New Circle*/
+				Circle circle = new Circle(50);
+				circle.setCenterX(50);
+				circle.setCenterY(50);
+				
+				circle.setTranslateX( c * 105 + 25);
+				circle.setTranslateY(r * 105 + 25);
+				
+				gameboard = Shape.subtract(gameboard, circle);
+				
+				/**New StackPane*/
+				StackPane stack = new StackPane();
+				stack.getChildren().addAll(circle, gameboard);
+
+			}
+		}
+		//Gameboard color set to yellow
+		gameboard.setFill(Color.YELLOW);
+		return gameboard;
+		
+	}
+	
+	
+	/**
+	 * Adds player's coin to their selected column
+	 * @param coin player's coin to drop
+	 * @param col column player has selected
+	 */
+	public void addCoin(Coin coin, int col)
+	{
+		/**Max number of rows*/
+		int r = 5;
+		
+		//Iterate through rows
+		do
+		{
+			//Find empty row
+			if (!getCoin(col, r).isPresent()) //isPresent : returns true if value present
+			{
+				break;
+			}
+			
+			r--;
+		}
+		
+		while (r >= 0);
+		
+		if (r < 0) //If no more rows
+		{
+			return;
+		}
+		
+		gameBoard[col][r] = coin; //Add coin
+		pane.getChildren().add(coin); //Add coin to pane
+		coin.setTranslateX(col * 105 + 25);
+		
+        TranslateTransition drop = new TranslateTransition(Duration.seconds(0.7), coin);
+        drop.setToY(r * 105 + 25);
+        drop.play();
+	}
+	
+	/**
+	 * Returns the column selected - P v C
+	 * @return List<Rectangle> Column selected as a list
+	 */
+	public List<Rectangle> colComp()
+	{
+		/**Column selected*/
+		List<Rectangle> colSelectedC = new ArrayList<>();
+		
+		for (int x = 0; x < 7; x++)
+		{
+			
+			/**Column selected*/
+			Rectangle column = new Rectangle(100, 800);
+			
+			column.setTranslateX(x * 105 + 25);
+			column.setFill(Color.TRANSPARENT);
+			column.setOnMouseExited(e -> column.setFill(Color.TRANSPARENT));
+			
+			//Adds player's coin to board
+			final int col = x;
+			
+			column.setOnMouseClicked( e -> {addCoin(new Coin(redCoin), col);
+			turn = !turn; //Switch players
+			char player;
+			
+			if (turn)
+			{
+				player = 'X';
+			}
+			
+			else
+			{
+				player = 'O';
+			}
+			
+			connect4.addPlay('X', col + 1); //Add offset
+			
+			//Check for winner
+			if (connect4.isWinner())
+			{
+				/** Create winAlert*/
+				Alert winAlert = new Alert(AlertType.INFORMATION);
+				winAlert.setTitle("Winner");
+				
+				if (player == 'X')
+				{
+					winAlert.setContentText("Computer won!");
+					winAlert.showAndWait();
+				}
+				
+				else if (player == 'O')
+				{
+					winAlert.setContentText("You won!");
+					winAlert.showAndWait();
+				}
+				
+				return;
+			}
+			
+			//Check for draw
+			if (connect4.isFull())
+			{
+				/**Create drawAlert*/
+				Alert drawAlert = new Alert(AlertType.INFORMATION);
+				drawAlert.setTitle("Draw");
+				
+				drawAlert.setContentText("Draw Game");
+				drawAlert.showAndWait();
+				return;
+			}
+			
+			int c = Connect4ComputerPlayer.compPlay(); //Calculate computer's play
+			Connect4ComputerPlayer.addCompPlay(); //Add computer's play
+			addCoin(new Coin(!redCoin), c);
+			
+		});
+			colSelectedC.add(column); //Adds column
+	}
+	return colSelectedC; //Returns the full column selected
+}
+	
+	/**
+	 * Returns column selected - P v P
+	 * @return List<Rectangle> Column selected as a list
+	 */
+	public List<Rectangle> colPlayer()
+	{
+		/**Column selected*/
+		List<Rectangle> colSelectedP = new ArrayList<>();
+		
+		for (int x = 0; x < 7; x++)
+		{
+			
+			/**Column selected*/
+			Rectangle column = new Rectangle(100, 800);
+			
+			column.setTranslateX(x * 105 + 25);
+			column.setFill(Color.TRANSPARENT);
+			column.setOnMouseExited(e -> column.setFill(Color.TRANSPARENT));
+			   
+			
+			
+			//Adds player's coin to board
+			final int col = x;
+			
+			column.setOnMouseClicked( e -> {addCoin(new Coin(redCoin), col);
+			turn = !turn; //Switch players
+			char player;
+			
+			if (turn)
+			{
+				player = 'X';
+			}
+			
+			else
+			{
+				player = 'O';
+			}
+			
+			connect4.addPlay('X', col + 1); //Add offset
+			
+			redCoin = !redCoin; //Add player change
+			
+			//Check for winner
+			if (connect4.isWinner())
+			{
+				/** Create winAlert*/
+				Alert winAlert = new Alert(AlertType.INFORMATION);
+				winAlert.setTitle("Winner");
+				
+				if (player == 'X')
+				{
+					winAlert.setContentText("Computer won!");
+					winAlert.showAndWait();
+				}
+				
+				else if (player == 'O')
+				{
+					winAlert.setContentText("You won!");
+					winAlert.showAndWait();
+				}
+				
+				return;
+			}
+			
+			if (connect4.isFull())
+			{
+				/**Create drawAlert*/
+				Alert drawAlert = new Alert(AlertType.INFORMATION);
+				drawAlert.setTitle("Draw");
+				
+				drawAlert.setContentText("Draw Game");
+				drawAlert.showAndWait();
+				return;
+			}
+		});
+			colSelectedP.add(column); //Adds column
+	}
+	return colSelectedP; //Returns the full column selected
+}
+	
+	/**
+	 * Returns the chosen column and row for piece
+	 * @param col column selected
+	 * @param row row selected
+	 * @return Optional<Coin> row and column
+	 *         empty = col isn't valid
+	 */
+	
+	//Optional : if value is present isPresent() will return true, get() will return value
+	public Optional<Coin> getCoin(int col, int row)
+	{
+		if (col < 0 || col >= 7 || row < 0 || row >= 6)
+		{
+			return Optional.empty();
+		}
+		
+		//ofNullable : Returns Optional describing value
+		return Optional.ofNullable(gameBoard[col][row]);
+	}
+	
+	/**
+	 * 
+	 * Creates coins used for game
+	 *
+	 */
+	public static class Coin extends Circle
+	{
+		/**Starting player (Red piece)*/
+		private final boolean xPlayer;
+		
+		public Coin(boolean xPlayer)
+		{
+			//Change color for each turn
+			super(50, xPlayer ? Color.RED : Color.BLACK);
+			this.xPlayer = xPlayer;
+			
+			setCenterX(50);
+			setCenterY(50);
+		}
+	}
+
+
+	@Override
+	public void start(Stage stage) throws Exception 
+	{
+		/**New StackPane*/
+		StackPane pane = new StackPane();
+		
+		/**Player vs Player button*/
+		Button bPlayer = new Button();
+		/**Player vs Computer button*/
+		Button bComp = new Button();
+		
+		//Set buttons
+		bComp.setTranslateY(40);
+		bPlayer.setText("Player vs Player");
+		bComp.setText("Player vs Computer");
+		
+		pane.getChildren().addAll(bPlayer, bComp); //Add buttons
+		
+		Scene scene = new Scene(pane, 300, 300);
+		stage.setTitle("Connect 4");
+		stage.setScene(scene);
+		stage.show();
+		
+		bPlayer.setOnMouseClicked(e -> { stage.setScene(new Scene(playGrid()));
+		stage.setResizable(true);
+		stage.show(); });
+		
+		bComp.setOnMouseClicked( e -> { stage.setScene(new Scene(compGrid()));
+			stage.setResizable(true);
+			stage.show(); }
+				);	
+		
+	}
+	
+	/**Main method*/
+	public static void main (String[] args)
+	{
+		launch(args);
+	}
+}
