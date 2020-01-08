@@ -1,0 +1,209 @@
+package core;
+
+
+/**
+ * Connect4 class : Handles game logic, placed in core package
+ * 
+ * @author Emma Hermick
+ * @version 5.0
+ *
+ */
+public class Connect4 
+{
+	
+	/** Gameboard where game is played*/
+	 public static char[][] gameBoard;
+	 
+	/**
+	 * Constructor
+	 * Initializes board and sets it up as empty
+	 */
+	public Connect4()
+	{
+		//Setup size of gameboard
+		gameBoard = new char[6][7];
+		
+		//Board is empty at start of game
+		for (int r = 0; r < gameBoard.length; r++)
+		{
+			for (int c = 0; c < gameBoard[r].length; c++)
+			{
+				gameBoard[r][c] = ' ';
+			}
+		}
+	}
+	
+	/**
+	 * Displays the gameboard
+	 */
+	public void display()
+	{
+		for (int r = 0; r < gameBoard.length; r++)
+		{
+			System.out.print("|");
+			
+			for (int c = 0; c < gameBoard[r].length; c++)
+			{
+				System.out.print(gameBoard[r][c] + "|");
+			}
+			
+			System.out.println();
+		}
+	}
+	
+	
+	/**
+	 * Adds player character to board
+	 * 
+	 * @param col - Player's selected column
+	 * @param player - true = player 'X'
+	 *                 false = player 'O'
+	 * @return true if play is added
+	 */
+	public boolean addPlay(char player, int play)
+	{
+		/**User's play has not been added yet*/
+		boolean add = false;
+		
+		//If invalid input
+		if (play < 0 || play > 7)
+		{
+			throw new ArrayIndexOutOfBoundsException("Invalid input");
+		}
+		
+		for (int r = gameBoard.length - 1; r >= 0; r--)
+		{
+			if (gameBoard[r][play - 1] == ' ')
+			{
+				gameBoard[r][play - 1] = player;
+				
+				add = true; //Player's play added
+				
+				break;
+			}
+		}
+		
+		return add;
+	}
+	
+	/**
+	 * Checks if column player has selected is full
+	 * @param play player's selected column
+	 * @return true = column is full
+	 *         false = column is not full
+	 */
+	public boolean isFull()
+	{
+		for (int i = 0; i < gameBoard[0].length; i++)
+		{
+			if (gameBoard[0][i] == ' ')
+			{
+				return false; //Spot is empty
+			}
+		}
+		
+		return true; //Spot is full
+		
+	}
+	
+	
+	
+	/**
+	 * Checks if there is a winner
+	 * @param player - Player's character : to check for 4 in a row
+	 * @return true there is a winner - game stops
+	 *         false there is no winner - game continues
+	 */
+	public boolean isWinner()
+	{
+		/**Horizontal win*/
+		boolean horiz = false;
+		/**Vertical win*/
+		boolean vert = false;
+		/**Increasing diagonal win*/
+		boolean incDiag = false;
+		/**Decreasing diagonal win*/
+		boolean decDiag = false;
+		
+			//Horizontal check
+			for (int r = 0; r <= 5; r++)
+			{
+				for (int c = 0; c <= 3; c++)
+				{
+					//Same row, incrementing column
+					if (gameBoard[r][c] == gameBoard[r][c + 1] 
+							&& gameBoard[r][c] == gameBoard[r][c + 2]
+							&& gameBoard[r][c] == gameBoard[r][c + 3]
+							&& gameBoard[r][c] != ' ')
+					{
+						horiz = true;
+						break;
+					}
+				}
+			}
+			
+			//Vertical check
+			for (int r = 0; r <= 2; r++)
+			{
+				for (int c = 0; c <= 6; c++)
+				{
+					//Same column, incrementing row
+					if (gameBoard[r][c] == gameBoard[r + 1][c] 
+							&& gameBoard[r][c] == gameBoard[r + 2][c]
+							&& gameBoard[r][c] == gameBoard[r + 3][c]
+							&& gameBoard[r][c] != ' ')
+					{
+						vert = true;
+						break;
+					}
+				}
+			}
+			
+			//Increasing diagonal check
+			for (int r = 0; r <= 2; r++)
+			{
+				for (int c = 0; c <= 6; c++)
+				{
+					//Incrementing one up, and one to the right
+					if (gameBoard[r][c] == gameBoard[r + 1][c - 1] 
+							&& gameBoard[r][c] == gameBoard[r + 2][c - 2]
+							&& gameBoard[r][c] == gameBoard[r + 3][c - 3]
+							&& gameBoard[r][c] != ' ')
+					{
+						incDiag = true;
+						break;
+					}
+				}
+			}
+			
+			//Decreasing diagonal check
+			for (int r = 3; r <= 2; r++)
+			{
+				for (int c = 0; c <= 3; c++)
+				{
+					//Incrementing one down, and one to the right
+					if (gameBoard[r][c] == gameBoard[r + 1][c + 1] 
+							&& gameBoard[r][c] == gameBoard[r + 2][c + 2]
+							&& gameBoard[r][c] == gameBoard[r + 3][c + 3]
+							&& gameBoard[r][c] != ' ')
+					{
+						decDiag = true;
+						break;
+					}
+				}
+			}
+			
+			//If any are true - someone is a winner
+			if (horiz || vert || incDiag || decDiag)
+			{
+				return true;
+			}
+			
+			//No winner
+			else
+			{
+				return false;
+			}
+	}	
+	
+}
