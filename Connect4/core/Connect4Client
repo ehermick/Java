@@ -1,0 +1,709 @@
+package core;
+
+/**
+ * Connect4Client class : Handles player moves
+ * 
+ * @author Emma Hermick , TicTacToeClient.java author
+ * 
+ * @version 1.0
+ *
+ */
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
+
+public class Connect4Client extends Application
+{
+	/**Whose turn is it*/ 
+	private static boolean myTurn = false;
+	
+	/**Token for player1*/
+	private char p1Token = ' ';
+	
+	/**Token for player2*/
+	private char p2Token = ' ';
+	
+	/**Create and initialize board*/
+	private Cell[][] board = new Cell[6][7];
+	
+	/**Title label*/
+	private Label lTitle = new Label();
+	
+	/**Status label*/
+	private Label lStatus = new Label();
+	
+	/**Selected column*/
+	private static int colSelected;
+	
+	/**Input stream from server*/
+	private DataInputStream fromServer;
+	/**Output stream to server*/
+	private DataOutputStream toServer;
+	
+	/**Continue to play?*/
+	private boolean contPlay = true;
+	
+	/**Wait for other player*/
+	private static boolean wait = true;
+	
+	//Host name
+	private String host = "localhost";
+	
+	private char select = '1'; //Preset to console
+	
+	/**Computer or Player*/
+	private int cOrP = 0; 
+	
+	/**String of gameboard*/
+	private String gameboard;
+	
+	/**Checks if column is valid*/
+	private boolean isValid;
+	
+	private GridPane pane;
+	
+	/**
+	 * Main method
+	 */
+	public static void main(String[] args)
+	{
+		Scanner s = new Scanner(System.in);
+		System.out.println("Select 1 for a console ui, select 2 for a gui");
+		String ans = s.next();
+		
+		while (ans.contentEquals("1") == false && ans.contentEquals("2") == false)
+		{
+			System.out.println("Please select 1 or 2");
+			ans = s.next();
+		}
+		
+		if(ans.contentEquals("1"))
+		{
+			new Connect4Client().connectToServer(0);
+		}
+		
+		else if (ans.contentEquals("2"))
+		{
+			Application.launch(Connect4Client.class);
+		}
+		
+	}
+
+	/**
+	 * Start method in Application class
+	 */
+	@Override
+	public void start(Stage primaryStage)
+	{
+		select = 2; //GUI
+		
+		/**Pane to hold cell*/
+		pane = new GridPane();
+		for (int i = 0; i < 6; i++)
+		{
+			for (int j = 0; j < 7; j++)
+			{	
+				this.board[i][j] = new Cell();
+				pane.add(this.board[i][j],  j,  i + 1);
+			}
+			
+			BorderPane borderPane = new BorderPane(); 
+			borderPane.setTop(lTitle);
+			borderPane.setCenter(pane);
+			borderPane.setBottom(lStatus);
+			
+			/**New scene*/
+			Scene scene = new Scene(borderPane, 700, 700);
+			primaryStage.setTitle("Connect4Client"); //Set title
+			primaryStage.setScene(scene); //Place scene
+			primaryStage.show(); //Display stage
+			
+			connectToServer(1); //Connect to server
+		}
+	}
+		private void connectToServer(int i)
+		{
+			try
+			{
+				/**New socket*/
+				Socket socket = new Socket(host, 8000);
+				
+				/**Input stream*/
+				fromServer = new DataInputStream(socket.getInputStream());
+				
+				/**Output stream*/
+				toServer = new DataOutputStream(socket.getOutputStream());
+			}
+			catch (Exception ex)
+			{
+				ex.printStackTrace();
+			}
+			
+			//Control game on separate thread
+			new Thread( () ->  {
+				try
+				{
+					Scanner s2 = new Scanner(System.in);
+					
+					
+					if (select == 1)
+					{
+						Platform.runLater( () -> {
+							System.out.println("Select C to play against Computer"
+									+ ", or P to play against another Player");
+							String ans = s2.next();
+							
+							while (ans.contentEquals("C") == false && ans.contentEquals("P") == false)
+							{
+								System.out.println("Please reselect either C or P");
+								ans = s2.next();
+							}
+							
+							if (ans.contentEquals("C"))
+							{
+								cOrP = 1;
+							}
+							
+							else if (ans.contentEquals("P"))
+							{
+								cOrP = 2;
+							}
+							
+							try
+							{
+								toServer.writeInt(cOrP);
+							}
+							
+							catch (IOException ex)
+							{
+								ex.printStackTrace();
+							}
+							
+						});
+					}
+					else
+					{
+						toServer.writeInt(i);
+					}
+					
+					/**Get notification from server*/
+					int player = fromServer.readInt();
+					
+					//Player 1 or Player 2
+					if (player == 1)
+					{
+						p1Token = 'X';
+						p2Token = 'O';
+						
+						//Console
+						if (select == 1)
+						{
+							Platform.runLater( () -> {
+								System.out.println("Player 1 (X) has joined. Your turn");
+							});
+						}
+						
+						//GUI
+						else
+						{
+							Platform.runLater( () -> {
+								lTitle.setText("Player 1 (Black) has joined") ;
+								lStatus.setText("Your turn");
+							});
+						}
+						
+						
+						//Receive startup notification from server
+						fromServer.readInt();
+						
+						//Console
+						if (select == 1)
+						{
+							Platform.runLater( () -> {
+								System.out.println("Player 2 has joined. Your turn");
+								System.out.println("Please select a column 1-7");
+								
+								while (s2.hasNextInt() == false)
+								{
+									System.out.println("Invalid selection");
+									s2.hasNextLine();
+								}
+								
+								colSelected = s2.nextInt();
+								myTurn = false;
+								wait = false;
+							});
+						}
+						
+						//GUI
+						else
+						{
+							Platform.runLater( () -> {
+								lTitle.setText("Player 2 has joined. Your turn");
+							});
+							
+							myTurn = true;
+						}
+					}
+					
+					else if (player == 2)
+					{
+						p1Token = 'O';
+						p2Token = 'X';
+						
+						//Console
+						if (select == 1)
+						{
+							Platform.runLater( () -> {
+								System.out.println("Player 2 (O)");
+								System.out.println("Waiting for Player 1 (X)");
+							});
+						}
+						
+						//GUI
+						else
+						{
+							Platform.runLater( () -> {
+								lTitle.setText("Player 2 (Red)") ;
+								lStatus.setText("Waiting for Player 1");
+								
+							});
+						}
+					}
+					
+					
+					//Continue to play
+					while (contPlay)
+					{
+						if (player == 1)
+						{
+							waitForPlayerAction(); //Wait for player1
+							sendMove(); //Send move to server
+							receiveInfoFromServer(); //Receive info from server
+						}
+						
+						else if (player == 2)
+						{
+							receiveInfoFromServer(); //Receive info from server
+							waitForPlayerAction(); //Wait for player 2
+							sendMove(); //Send player 2 move to server
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					ex.printStackTrace(); 
+				}
+			}).start();
+		}
+		
+		/**
+		 * Wait for player to mark cell
+		 */
+		private void waitForPlayerAction() throws InterruptedException
+		{
+			while (wait)
+			{
+				Thread.sleep(100);
+			}
+			wait = true;
+		}
+		
+		/**
+		 * Sends player's move to the server
+		 * @throws InterruptedException 
+		 */
+		private void sendMove() throws IOException, InterruptedException
+		{
+			toServer.writeInt(colSelected); //Send selected column
+			
+			isValid = fromServer.readBoolean();
+			
+			while (!isValid)
+			{
+				myTurn = true;
+				
+				Scanner s3 = new Scanner(System.in);
+				
+				//Console
+				if (select == 1)
+				{
+					Platform.runLater( () -> {
+						System.out.println("Invalid input");
+						
+						while (s3.hasNextInt() == false)
+						{
+							System.out.println("Please reselect");
+							s3.hasNextLine();
+						}
+						
+						colSelected = s3.nextInt();
+						myTurn = false;
+						wait = false;
+					});
+				}
+				
+				//GUI
+				else if (select == 2)
+				{
+					Platform.runLater( () -> {
+						lStatus.setText("Invalid input - Please reselect");
+						myTurn = true;
+					});
+				}
+				
+				waitForPlayerAction();
+				toServer.writeInt(colSelected);
+				isValid = fromServer.readBoolean();
+			}
+			
+			gameboard = fromServer.readUTF();
+			
+			//Console
+			if (select == 1)
+			{
+				Platform.runLater( () -> {
+					System.out.println(gameboard);
+					System.out.println("Waiting for other player");
+				});
+			}
+			
+			//GUI
+			else if (select == 2)
+			{
+				int row = board.length - 1;
+				char token = board[row][colSelected - 1].getToken();
+				
+				while (token != ' ')
+				{
+					row--;
+					token = board[row][colSelected - 1].getToken();
+				}
+				
+				board[row][colSelected - 1].setToken(p1Token);
+				
+				Platform.runLater( () -> {
+					lStatus.setText("Waiting for other player");
+				});
+			}
+			
+		}
+		
+		/**
+		 * Receives info from the server
+		 */
+		private void receiveInfoFromServer() throws IOException
+		{
+			/**Game status*/
+			int status = fromServer.readInt();
+			
+			//Player 1 won
+			if (status == 1)
+			{
+				contPlay = false;//End game
+			
+				if (p1Token == 'X')
+				{
+					gameboard = fromServer.readUTF();
+					
+					//Console
+					if (select == 1)
+					{
+						Platform.runLater( () -> {
+							System.out.println(gameboard);
+							System.out.println("You won");
+						});
+					}
+					
+					//GUI
+					else if (select == 2)
+					{
+						Platform.runLater( () -> {
+							lStatus.setText("You won");
+							pane.setDisable(true);
+						});
+					}
+				}
+				
+				else if (p2Token == 'O')
+				{
+					receiveMove();
+					
+					//Console
+					if (select == 1)
+					{
+						Platform.runLater( () -> {
+							System.out.println("You lost");
+						});
+					}
+					
+					//GUI
+					else if (select == 2)
+					{
+						Platform.runLater( () -> {
+							lStatus.setText("You lost");
+							pane.setDisable(true);
+						});
+					}
+				}	
+			}
+			
+			//Player 2 won
+			else if (status == 2)
+			{
+				contPlay = false; //End game
+				
+				if (p1Token == 'X')
+				{
+					receiveMove();
+					
+					//Console
+					if (select == 1)
+					{
+						Platform.runLater( () -> {
+							System.out.println("You lost");
+						});
+					}
+					
+					//GUI
+					else if (select == 2)
+					{
+						Platform.runLater( () -> {
+							lStatus.setText("You lost");
+							pane.setDisable(true);
+						});
+					}
+				}
+				
+				else if (p2Token == 'O')
+				{
+					gameboard = fromServer.readUTF();
+					
+					//Console
+					if (select == 1)
+					{
+						Platform.runLater( () -> {
+							System.out.println(gameboard);
+							System.out.println("You won");
+						});
+					}
+					
+					//GUI
+					else if (select == 2)
+					{
+						Platform.runLater( () -> {
+							lStatus.setText("You won");
+							pane.setDisable(true);
+						});
+					}
+				}
+			}
+			
+			//Draw game
+			else if(status == 3)
+			{
+				gameboard = fromServer.readUTF();
+				
+				contPlay = false;//End game
+				
+				//Console
+				if (select == 1)
+				{
+					Platform.runLater( () -> {
+						System.out.println(gameboard);
+						System.out.println("Tie game");
+					});
+				}
+				
+				//GUI
+				else if (select == 2)
+				{
+					Platform.runLater( () -> {
+						lStatus.setText("Tie game");
+						pane.setDisable(true);
+					});
+				}
+			}
+			
+			else
+			{
+				receiveMove();
+				
+				//Console
+				if (select == 1)
+				{
+					Scanner s4 = new Scanner(System.in);
+					
+					Platform.runLater( () -> {
+						System.out.println("Your turn. Please select a column 1-7");
+						
+						while (s4.hasNextInt() == false)
+						{
+							System.out.println("Invalid input - Please reselect");
+							s4.hasNextLine();
+						}
+						
+						colSelected = s4.nextInt();
+						myTurn = false;
+						wait = false;
+					});
+				}
+				
+				//GUI
+				else if (select == 2)
+				{
+					Platform.runLater( () -> {
+						lStatus.setText("Your turn");
+					});
+				}
+				
+				myTurn = true;
+			}
+				
+		}
+		
+		/**
+		 * Received other player's moves
+		 * 
+		 * @throws IOException
+		 */
+		private void receiveMove() throws IOException
+		{
+			/**Other player's selected row*/
+			int row = fromServer.readInt();
+			/**Other player's selected column*/
+			int col = fromServer.readInt();
+			
+			gameboard = fromServer.readUTF();
+			
+			//Console
+			if (select == 1)
+			{
+				Platform.runLater( () -> 
+					System.out.println(gameboard)
+						);
+			}
+			
+			//GUI
+			else if (select == 2)
+			{
+				Platform.runLater( () -> 
+					board[row][col].setToken(p2Token)
+						);
+			}
+		}
+		
+		/**
+		 * Inner class for a cell
+		 */
+		public static class Cell extends Pane
+		{
+			
+			/**Token used for cell*/
+			private char token;
+			
+			/**Circle object*/
+			public Circle circle;
+			
+			/**
+			 * Creates the cells in game board - Multiple cells with circles
+			 * @param row 
+			 * @param col
+			 */
+			public Cell()
+			{
+				this.setPrefSize(600,  600);
+				setStyle("-fx-border-color: yellow; -fx-background-color: yellow");//Set border
+				
+				this.circle = new Circle(45, Color.ANTIQUEWHITE); //Color for filling of square
+				circle.setStroke(Color.CORAL); //Color around the circle
+			
+				this.getChildren().addAll(circle); //Add circles
+				
+				token = ' ';
+			}
+			
+			/**
+			 * Getter : Returns token
+			 * 
+			 * @return token Player's token
+			 */
+			public char getToken()
+			{
+				return token;
+			}
+			
+			/**
+			 * Setter : Sets token
+			 * 
+			 * @param c Player's token
+			 */
+			public void setToken(char p1Token)
+			{
+				token = p1Token;
+				repaint();
+			}
+			
+			/**
+			 * Creates game pieces for a player's move
+			 */
+			public void repaint()
+			{
+				if (token == 'X') //Red
+				{
+					Circle circle = new Circle(40);
+					
+					circle.setCenterY(50);
+					circle.setTranslateY(5);
+					
+					circle.setCenterX(50);
+					circle.setTranslateX(3);
+					
+					circle.setFill(Color.RED);
+
+					this.getChildren().addAll(circle);//Add to pane
+				}
+				
+				else if( token == 'O') //Black
+				{
+					Circle circle = new Circle(40);
+					
+					circle.setCenterY(50);
+					circle.setTranslateY(5);
+					
+					circle.setCenterX(50);
+					circle.setTranslateX(3);
+					
+					circle.setFill(Color.BLACK);
+
+					this.getChildren().addAll(circle);//Add to pane
+				}
+			}
+			
+			/**
+			 * Handles mouse click event
+			 */
+		    private void handleMouseClick(int col) 
+		    {
+		    	if (myTurn)
+		    	{
+		    		myTurn = false;
+		    		colSelected = col;
+		    		wait = false;
+		    	}
+		    }
+		}
+		
+
+}
