@@ -1,0 +1,218 @@
+package ui;
+
+import java.util.Scanner;
+
+import core.Connect4;
+import core.Connect4ComputerPlayer;
+import core.Connect4Server;
+
+import java.util.InputMismatchException;
+
+import javafx.application.Application;
+
+/**
+ * Connect4TextConsole class : Console based UI to test the game
+ * 
+ * @author Emma Hermick
+ * @version 4.0
+ */
+
+public class Connect4TextConsole 
+{
+	
+	/**
+	 * Main method : Runs the game
+	 * @param args
+	 */
+	public static void main(String[] args)
+	{
+		/**Connect4 object*/
+		Connect4 game = new Connect4();
+		/**Tracks whose turn it is*/
+		boolean turn = true;
+		/**Sets up for user input*/
+		Scanner input = new Scanner(System.in);
+		
+		System.out.println("Enter 'G' if you want to play with the GUI, "
+				+ " or enter 'C' to play with the Console");
+
+		/**Stores user input for beginning of game*/
+		char gOrC = input.next().charAt(0);
+		
+		//If GUI selected
+		if (gOrC == 'G')
+		{
+			Application.launch(Connect4Server.class, args); //Launch GUI through Connect4Server
+		}
+		
+		//If Console selected
+		if (gOrC == 'C')
+		{
+			System.out.println("Begin Game.");
+			System.out.println("Please enter 'P' if you want to play against another player" 
+					+ " or 'C' if you want to play against the computer");
+			
+			/**Stores user input*/
+			char pOrC = input.next().charAt(0);
+			
+			//If user selects against player
+			if (pOrC == 'P')
+			{
+				do
+				{
+					turn = !turn; //Switches player
+					
+					game.display();//Display board
+					
+					char player;
+					
+					//Player O
+					if (turn)
+					{
+						player = 'O';
+					}
+					
+					//Player X
+					else
+					{
+						player = 'X';
+					}
+					
+					System.out.println("Player" + player + " your turn. Please select a column 1- 7");
+					
+					/**If selection not added*/
+					boolean pos = false;
+					
+					while (!pos)
+					{
+						try
+						{
+							pos = game.addPlay(player,  input.nextInt());
+							
+							//If addPlay doesn't happen
+							if (!pos)
+							{
+								System.out.println("Invalid input");
+							}
+						}
+						
+						catch(Exception e)
+						{
+							//Invalid input
+							System.out.println("Please select another column:");
+							input.nextLine();
+						}
+					}
+					
+					System.out.println();
+					
+				}
+			
+				//While there's no winner yet, and no draw yet
+				while (!game.isFull() && !game.isWinner());
+			
+				game.display(); //Display board
+			
+				//If a player wins
+				if (game.isWinner())
+				{
+					System.out.println("Player" + (turn ? "O" : "X" ) + "has won");
+				}
+			
+				//If there's a draw
+				else
+				{
+					System.out.println("Draw Game!");
+				}
+			
+				input.close(); //Close input
+			}
+			
+			//If computer selected
+			else if (pOrC == 'C')
+			{
+				do 
+				{
+					turn = !turn; //Switch players
+					game.display(); //Display board
+					char player;
+					
+					/**If selection not added*/
+					boolean pos = false;
+					
+					//Player O
+					if (turn)
+					{
+						player = 'O';
+					}
+					
+					//Player X
+					else
+					{
+						player = 'X';
+					}
+					
+					
+					while (!pos)
+					{
+						if (player == 'X')
+						{
+							System.out.println("It's your turn! Please select a column");
+							
+							try
+							{
+								//Adds input
+								pos = game.addPlay(player, input.nextInt());
+								
+								if (!pos) //If not added
+								{
+									System.out.println("Invalid input");
+								}
+							}
+							
+							catch (Exception e)
+							{
+								System.out.println("Please enter a valid column");
+								input.nextLine();
+							}
+						}
+						
+						else if(player == 'O')
+						{
+							try
+							{
+								pos = Connect4ComputerPlayer.addCompPlay(); //Places comp play
+							}
+							
+							catch (Exception e)
+							{
+								System.out.println("Computer needs to reselect");
+							}
+						}
+					}
+					System.out.println();
+				
+				}
+			
+			
+				//If no winner or tie
+				while (!game.isFull() && !game.isWinner());
+			
+				game.display();
+			
+				//If someone has won
+				if (game.isWinner())
+				{
+					System.out.println("The" + (turn ? "Computer" : "Player") + "has won the game");
+				}
+				
+				else
+				{
+					System.out.println("Draw game!");
+				}
+			
+				input.close();
+			}
+		}
+	}
+}
