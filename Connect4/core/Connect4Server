@@ -1,0 +1,656 @@
+package core;
+
+/**
+ * Connect4Server class : Handles game logic and controls all game sessions
+ * 
+ * @author Emma Hermick , TicTacToeServer.java author
+ * 
+ * @version 1.0
+ *
+ */
+
+import java.io.*;
+import java.net.*;
+import java.util.Date;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
+public class Connect4Server extends Application
+{
+	/**Session number*/
+	private int sessionNo = 1; 
+	
+	/**Waiting for another player*/
+	private Socket waitingPlayer;
+	
+	/**Session number*/
+	private int waitingSession;
+	
+	/**TextArea*/
+	private TextArea tA;
+	
+
+	/**
+	 * Start method in Application class
+	 */
+	@Override
+	public void start(Stage primaryStage)
+	{
+
+		tA = new TextArea();
+		
+		ScrollPane sP = new ScrollPane(tA);
+		VBox mainP = new VBox();
+		
+		mainP.getChildren().add(sP);
+		
+		/**New Scene*/
+		Scene s = new Scene(mainP, 450, 200);
+		primaryStage.setTitle("Connect4 Server"); //Title
+		primaryStage.setScene(s); //Add scene to stage
+		primaryStage.show();//Display stage
+		startServer(true, 8000);
+	}
+	
+	/**
+	 * Starts server request
+	 * @param flag 
+	 * @param address
+	 */
+	public void startServer(boolean flag, int address)
+	{
+		new Thread( () -> {
+			try {
+				/**New ServerSocket*/
+				ServerSocket sS = new ServerSocket(address);
+				
+				if (flag)
+				{
+					Platform.runLater( () -> tA.appendText(new Date() + 
+							": Server started at socket 8000\n"));
+				}
+				
+				while (true)
+				{
+					if (flag)
+					{
+						Platform.runLater( () -> tA.appendText(new Date() +
+								": Wait for players to join session " + sessionNo + '\n'));
+					}
+					
+					Socket s1 = sS.accept();
+					
+					int cOrP = new DataInputStream(s1.getInputStream()).readInt();
+					
+					//Computer
+					if (cOrP == 1)
+					{
+						if (flag)
+						{
+							Platform.runLater( () -> {
+								tA.appendText(new Date() + ": Player 1 joined session "
+										+ sessionNo + '\n');
+								tA.appendText("Player 1's IP address" + 
+										s1.getInetAddress().getHostAddress() + '\n');
+							});
+						}
+						
+						new DataOutputStream(s1.getOutputStream()).writeInt(1); //Player1
+						
+						if (flag)
+						{
+							//Display session and increment session number
+							Platform.runLater( () -> tA.appendText(new Date() +
+									": Start a thread for session " + sessionNo++ + '\n'));
+							
+							/**Launch a new thread for session*/
+							new Thread(new HandleASession(s1)).start();	
+						}
+					}
+					
+					//Player
+					else 
+					{
+						if (cOrP == 2 && waitingPlayer == null)
+						{
+							if (flag)
+							{
+								Platform.runLater( () -> {
+									tA.appendText(new Date() + ": Player 1 joined session "
+											+ sessionNo + '\n');
+									tA.appendText("Player 1's IP address" + 
+											s1.getInetAddress().getHostAddress() + '\n');
+								});
+							}
+							
+							new DataOutputStream(s1.getOutputStream()).writeInt(1);
+							
+							waitingPlayer = s1;
+							waitingSession = sessionNo;
+							sessionNo++;
+							continue;
+						}
+						
+						else if(cOrP == 2 && waitingPlayer != null)
+						{
+							if (flag)
+							{
+								Platform.runLater( () -> {
+									tA.appendText(new Date() + ": Player 2 joined session "
+											+ waitingSession + '\n');
+									tA.appendText("Player 2's IP address" + 
+											s1.getInetAddress().getHostAddress() + '\n');
+								});
+							}
+							
+							new DataOutputStream(s1.getOutputStream()).writeInt(2);
+							
+							if (flag)
+							{
+								//Display session and increment session number
+								Platform.runLater( () -> tA.appendText(new Date() +
+										": Start a thread for session " + waitingSession + '\n'));
+							}
+							
+							/**Launch a new thread for session*/
+							new Thread(new HandleASession(waitingPlayer, s1)).start();	
+						}
+						
+						waitingPlayer = null;
+					}
+						
+				}
+				
+			}
+			
+			catch(IOException ex)
+			{
+				ex.printStackTrace(); //Prints throwable
+			}
+		}).start();
+	}
+	
+	
+	/**
+	 * Handles a new session for two players
+	 *
+	 */
+	public static class HandleASession implements Runnable
+	{
+		/**Computer or player*/
+		private int cOrP;
+		
+		/**Player 1 socket*/
+		private Socket player1;
+		
+		/**Player 2 socket*/
+		private Socket player2;
+		
+		/**Create and initialize board*/
+		private char[][] board = new char[6][7];
+		
+		/**Connect4ComputerPlayer object*/
+		private Connect4ComputerPlayer comp;
+		
+		/**Input stream - player 1*/
+		private DataInputStream player1Input;
+		
+		/**Input stream - player 2*/
+		private DataInputStream player2Input;
+		
+		/**Output stream - player 1*/
+		private DataOutputStream player1Output;
+		
+		/**Output stream - player 2*/
+		private DataOutputStream player2Output;
+		
+		/**
+		 * Sets up game for player vs computer
+		 * @param player1 
+		 */
+		public HandleASession(Socket player1)
+		{
+			this.cOrP = 1; //Computer
+			this.player1 = player1;
+			
+			//Initialize cells
+			for (int i = 0; i < board.length; i++)
+			{
+				for (int j = 0; j < board[0].length; j++)
+				{
+					board[i][j] = ' ';
+				}
+			}
+		}
+		
+		/**
+		 * Sets up game for player vs player
+		 * @param player1
+		 * @param player2
+		 */
+		public HandleASession(Socket player1, Socket player2)
+		{
+			this.cOrP = 2;
+			this.player1 = player1;
+			this.player2 = player2;
+			
+			for (int i = 0; i < board.length; i++)
+			{
+				for (int j = 0; j < board[0].length; j++)
+					board[i][j] = ' ';
+			}
+		}
+		
+		/**
+		 * Implements run() method
+		 */
+		public void run()
+		{
+			try
+			{
+				//Create data input and output streams
+				/**FROM player 1*/
+				player1Input = new DataInputStream(player1.getInputStream());
+				
+				/**TO player1*/
+				player1Output = new DataOutputStream(player1.getOutputStream());
+				
+				if (this.cOrP == 2)
+				{
+					/**FROM player2*/
+					player2Input = new DataInputStream(player2.getInputStream());
+					
+					/**TO player2*/
+					player2Output = new DataOutputStream(player2.getOutputStream());
+				}
+				
+				else
+				{
+					this.comp = new Connect4ComputerPlayer();
+				}
+				
+				//Notifies player 1 to start
+				player1Output.writeInt(1);
+				
+				if (cOrP == 2) //Player
+				{
+					while (true)
+					{
+						int col = player1Input.readInt();
+						
+						while (isValid(col) == false)
+						{
+							player1Output.writeBoolean(false);
+							col = player1Input.readInt();
+						}
+						
+						player1Output.flush();
+						player1Output.writeBoolean(true);
+						col--;
+						
+						int row = board.length - 1;
+						
+						char spot = board[row][col];
+						
+						while (spot != ' ')
+						{
+							row--;
+							spot = board[row][col];
+						}
+						
+						board[row][col] = 'X';
+						
+						sendGameString(player1Output);
+						
+						if (isWon() == true)
+						{
+							player1Output.writeInt(1); //Player 1 won
+							player2Output.writeInt(1);
+							
+							compPlay(player2Output, row, col);
+							sendGameString(player1Output);
+							sendGameString(player2Output);
+							break;
+						}
+						
+						else if (isDraw() == true)
+						{
+							player1Output.writeInt(3); //Draw
+							player2Output.writeInt(3);
+							
+							compPlay(player2Output, row, col);
+							sendGameString(player1Output);
+							sendGameString(player2Output);
+							break;
+						}
+						
+						else
+						{
+							player2Output.writeInt(4); //Continue game
+							compPlay(player2Output, row, col);
+							sendGameString(player2Output);
+						}
+						
+						col = player2Input.readInt();
+						
+						while (isValid(col) == false)
+						{
+							player2Output.writeBoolean(false);
+							col = player2Input.readInt();
+						}
+						
+						player2Output.writeBoolean(true);
+						col--;
+						row = board.length - 1;
+						spot = board[row][col];
+						
+						while (spot != ' ')
+						{
+							row--;
+							spot = board[row][col];
+						}
+						
+						board[row][col] = 'O';
+						
+						sendGameString(player2Output);
+						
+						if (isWon() == true)
+						{
+							player2Output.flush();
+							player1Output.writeInt(2);
+							player2Output.writeInt(2);
+							compPlay(player1Output, row, col);
+							sendGameString(player1Output);
+							sendGameString(player2Output);
+							break;
+						}
+						
+						else if (isDraw() == true)
+						{
+							player1Output.writeInt(3);//Draw
+							player2Output.writeInt(3);
+							compPlay(player1Output, row, col);
+							sendGameString(player1Output);
+							sendGameString(player2Output);
+							break;
+						}
+						
+						else
+						{
+							player1Output.writeInt(4);//Continue game
+							compPlay(player1Output, row, col);
+							sendGameString(player1Output);
+						}
+					}
+				}
+				
+				else if (cOrP == 1) //Computer
+				{
+					while(true)
+					{
+						int col = player1Input.readInt();
+						
+						while (isValid(col) == false)
+						{
+							player1Output.writeBoolean(false);
+							col = player1Input.readInt();
+						}
+						
+						player1Output.flush();
+						player1Output.writeBoolean(true);
+						col--;
+						int row = board.length - 1;
+						char spot = board[row][col];
+						while (spot != ' ')
+						{
+							row--;
+							spot = board[row][col];
+						}
+						
+						board[row][col] = 'X';
+						
+						sendGameString(player1Output);
+						
+						if (isWon() == true)
+						{
+							player1Output.writeInt(1); //Player 1 wins
+							sendGameString(player1Output);
+							break;
+						}
+						
+						else if (isDraw() == true)
+						{
+							player1Output.writeInt(3);
+							sendGameString(player1Output);
+							break;
+						}
+						
+						col = comp.compPlay();
+						
+						while (isValid(col) == false)
+						{
+							col = comp.compPlay();
+						}
+						
+						col--;
+						row = board.length - 1;
+						
+						spot = board[row][col];
+						
+						while (spot != ' ')
+						{
+							row--;
+							spot = board[row][col];
+						}
+						
+						board[row][col] = 'O';
+						
+						if (isWon() == true)
+						{
+							player1Output.writeInt(2); //Player 2 won
+							
+						}
+						
+						else if (isDraw() == true)
+						{
+							player1Output.writeInt(3);
+							compPlay(player1Output, row, col);
+							sendGameString(player1Output);
+							break;
+						}
+						
+						else
+						{
+							player1Output.writeInt(4);//Continue game
+							compPlay(player1Output, row, col);
+							sendGameString(player1Output);
+						}
+					}
+				}
+			}
+			catch (IOException ex)
+			{
+				ex.printStackTrace();
+			}
+					
+		}
+				
+		
+		/**
+		 * Accessor method for gameboard
+		 * @return
+		 */
+		public char[][] getBoard()
+		{
+			return board;
+		}
+		
+		/**
+		 * Sends the move to the other player
+		 * @param out output stream
+		 * @param row selected row
+		 * @param col selected column
+		 * @throws IOException
+		 */
+		public void compPlay(DataOutputStream out, int row, int col) throws IOException
+		{
+			out.writeInt(row);//Send row
+			out.writeInt(col);//Send col
+		}
+		
+		public void sendGameString(DataOutputStream out) throws IOException
+		{
+			String display = "|";
+			
+			for (int i = 0; i < board.length - 1; i++)
+			{
+				for (int j = 0; j < board[0].length; j++)
+				{
+					display = display + Character.toString(board[i][j]) + "|";
+				}
+				
+				display = display + '\n' + "|";
+			}
+			
+			for (int x = 0; x < board[0].length; x++)
+			{
+				display = display + Character.toString(board[board.length - 1][x]) + "|";
+			}
+			
+			display = display + '\n';
+			out.writeUTF(display);
+		}
+		
+		
+		/**
+		 * Determines if a specific player wins
+		 * @return true = Winner
+		 *         false = No winner
+		 */
+		public boolean isWon()
+		{
+		      /**Check all rows*/
+		      for (int i = 0; i <= 5; i++)
+		      {
+		    	  for (int j = 0; j <=3; j++) 
+		    	  {
+		    		  char token = board[i][j];
+		    		  
+		    		  if ((board[i][j] == token)
+		    				  && (board[i][j + 1] == token)
+		    				  && (board[i][j + 2] == token)
+		    				  && (board[i][j + 3] == token))
+		    		  {
+		    			  return true;
+		    		  }
+		    		  
+		    	  }
+		      }
+		      
+		      /** Check all columns */
+		      for (int i = 0; i <= 2; i++)
+		      {
+		    	  for (int j = 0; j <= 6; j++)
+		    	  {
+		    		  char token = board[i][j];
+		    		  
+		    		  if ((board[i][j] == token)
+		    				  && (board[i + 1][j] == token)
+		    				  && (board[i + 2][j] == token)
+		    				  && (board[i + 3][j] == token))
+		    		  {
+		    			  return true;
+		    		  }
+		    	  }
+		      }
+		    	 
+		      /** Check major diagonal */
+		      for (int i = 0; i <= 2; i++)
+		      {
+		    	  for (int j = 3; j <= 6; j++)
+		    	  {
+		    		  char token = board[i][j];
+		    		  
+		    		  if ((board[i][j] == token)
+		    				  && (board[i + 1][j - 1] == token)
+		    				  && (board[i + 2][j - 2] == token)
+		    				  && (board[i + 3][j - 3] == token))
+		    		  {
+		    			  return true;
+		    		  }
+		    		  
+		    	  }
+		      }
+
+		      /** Check subdiagonal */
+		      for (int i = 0; i <= 2; i++)
+		      {
+		    	  for (int j = 0; j <= 3; j++)
+		    	  {
+		    		  char token = board[i][j];
+		    		  
+		    		  if ((board[i][j] == token)
+		    				  && (board[i + 1][j + 1] == token)
+		    				  && (board[i + 2][j + 2] == token)
+		    				  && (board[i + 3][j + 3] == token))
+		    		  {
+		    			  return true;
+		    		  }
+		    		  
+		    	  }
+		      }
+
+		      /** All checked, but no winner */
+		      return false;
+		
+		  }
+	
+		/**
+		 * Checks if move is a valid play
+		 * @param col
+		 * @return
+		 */
+		public boolean isValid(int col)
+		{
+			if (col <= 0 || col > 7)
+			{
+				return false;
+			}
+			else
+			{
+				return true; 
+			}
+		}
+		
+		/**
+		 * Checks for a tie game
+		 * @return true - tie game
+		 *         false - game continues
+		 */
+		public boolean isDraw()
+		{
+			for (int i = 0; i < board[0].length; i++)
+			{
+				if (board[0][i] == ' ')
+				{
+					return false;
+				}
+			}
+			
+			return true;
+		}
+		
+		
+		public static void main(String[] args)
+		{
+			launch(args);
+		}
+		
+	}
+}
+
